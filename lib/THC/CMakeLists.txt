@@ -137,6 +137,7 @@ SET(src
 SET(src-cuda
   THCReduceApplyUtils.cu
   THCBlas.cu
+  THCusparse.cu
   THCStorage.cu
   THCStorageCopy.cu
   THCTensor.cu
@@ -184,7 +185,7 @@ MESSAGE(STATUS "CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS}")
 
 CUDA_ADD_LIBRARY(THC SHARED ${src} ${src-cuda})
 CUDA_ADD_CUBLAS_TO_TARGET(THC)
-TARGET_LINK_LIBRARIES(THC TH ${CUDA_curand_LIBRARY})
+TARGET_LINK_LIBRARIES(THC TH ${CUDA_curand_LIBRARY} ${CUDA_cusparse_LIBRARY})
 
 IF(USE_MAGMA)
   TARGET_LINK_LIBRARIES(THC ${MAGMA_LIBRARIES} ${CUDA_cusparse_LIBRARY})
@@ -199,6 +200,7 @@ INSTALL(FILES
           THC.h
           ${CMAKE_CURRENT_BINARY_DIR}/THCGeneral.h
           THCBlas.h
+          THCusparse.h
           THCStorage.h
           THCStorageCopy.h
           THCStream.h
