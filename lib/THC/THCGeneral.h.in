@@ -9,6 +9,7 @@
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "cublas_v2.h"
+#include "cusparse_v2.h"
 
 #cmakedefine USE_MAGMA
 
@@ -57,8 +58,10 @@ typedef struct _THCCudaResourcesPerDevice {
   THCStream** streams;
   /* Number of materialized cuBLAS handles */
   int numBlasHandles;
+  int numCusparseHandles;
   /* cuBLAS handes are lazily initialized */
   cublasHandle_t* blasHandles;
+  cusparseHandle_t* cusparseHandles;
   /* Size of scratch space per each stream on this device available */
   size_t scratchSpacePerStream;
   /* Device-resident scratch space per stream, used for global memory
@@ -82,7 +85,7 @@ struct THCState {
   /* Number of Torch defined resources available, indices 1 ... numStreams */
   int numUserStreams;
   int numUserBlasHandles;
-
+  int numUserCusparseHandles;
   /* Allocator using cudaMallocHost. */
   THAllocator* cudaHostAllocator;
   THAllocator* cudaUVAAllocator;
@@ -91,6 +94,7 @@ struct THCState {
   /* Index of the current selected BLAS handle. The actual BLAS handle used
      depends on the current device. */
   THCThreadLocal/*<int>*/ currentPerDeviceBlasHandle;
+  THCThreadLocal/*<int>*/ currentPerDeviceCusparseHandle;
   /* Array of thread locals containing the current stream for each device */
   THCThreadLocal* currentStreams;
 
@@ -159,12 +163,18 @@ THC_API int THCState_getCurrentStreamIndex(THCState *state);
 THC_API void THCState_setCurrentStreamIndex(THCState *state, int stream);
 
 THC_API void THCState_reserveBlasHandles(THCState* state, int numHandles);
+THC_API void THCState_reserveCusparseHandles(THCState* state, int numHandles);
 THC_API int THCState_getNumBlasHandles(THCState* state);
+THC_API int THCState_getNumCusparseHandles(THCState* state);
 
 THC_API cublasHandle_t THCState_getDeviceBlasHandle(THCState *state, int device, int handle);
+THC_API cusparseHandle_t THCState_getDeviceCusparseHandle(THCState *state, int device, int handle);
 THC_API cublasHandle_t THCState_getCurrentBlasHandle(THCState *state);
+THC_API cusparseHandle_t THCState_getCurrentCusparseHandle(THCState *state);
 THC_API int THCState_getCurrentBlasHandleIndex(THCState *state);
+THC_API int THCState_getCurrentCusparseHandleIndex(THCState *state);
 THC_API void THCState_setCurrentBlasHandleIndex(THCState *state, int handle);
+THC_API void THCState_setCurrentCusparseHandleIndex(THCState *state, int handle);
 
 /* For the current device and stream, returns the allocated scratch space */
 THC_API void* THCState_getCurrentDeviceScratchSpace(THCState* state);
@@ -175,10 +185,12 @@ THC_API size_t THCState_getDeviceScratchSpaceSize(THCState* state, int device);
 #define THCudaCheck(err)  __THCudaCheck(err, __FILE__, __LINE__)
 #define THCudaCheckWarn(err)  __THCudaCheckWarn(err, __FILE__, __LINE__)
 #define THCublasCheck(err)  __THCublasCheck(err,  __FILE__, __LINE__)
+#define THCusparseCheck(err)  __THCusparseCheck(err,  __FILE__, __LINE__)
 
 THC_API void __THCudaCheck(cudaError_t err, const char *file, const int line);
 THC_API void __THCudaCheckWarn(cudaError_t err, const char *file, const int line);
 THC_API void __THCublasCheck(cublasStatus_t status, const char *file, const int line);
+THC_API void __THCusparseCheck(cusparseStatus_t status, const char *file, const int line);
 
 THC_API cudaError_t THCudaMalloc(THCState *state, void **ptr, size_t size);
 THC_API cudaError_t THCudaFree(THCState *state, void *ptr);
